@@ -1,0 +1,5 @@
+numpy
+pandas
+glob2
+argparse
+opencv-python

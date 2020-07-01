@@ -89,8 +89,9 @@ else:
         img=cv2.imread(image)
         dic['pics'].append(copy.deepcopy(img))
         cv2.namedWindow('image',cv2.WINDOW_NORMAL)
-        cv2.setMouseCallback('image',draw)
+        cv2.setMouseCallback('image',draw)             
         while(1):
+            #img=cv2.resize(img, (1080, 1920),interpolation = cv2.INTER_CUBIC)
             cv2.imshow('image',img)
             k = cv2.waitKey(1) & 0xFF
             if k == ord('r'): #reload
@@ -101,7 +102,6 @@ else:
             if k == ord('s'): # quit
                 #np.savetxt('/home/dhanush/images1/csv/%s.csv'%((image.split('/')[-1]).split('.')[0]),local_array,delimiter=',')
                 if not bounding_done:
-                    pd.DataFrame(data=dic['bounding_box'],columns=['top_left-x','top_left-y','bottom_right-x','bottom_right-y']).to_csv('/home/dhanush/images1/csv/%s.csv'%((image.split('/')[-1]).split('.')[0]))
                     undo.append(copy.deepcopy(dic))
                     bounding_done=True
                 else:
@@ -129,6 +129,8 @@ else:
                 ex=True
                 break
             if k == ord('n'):
+                df=pd.DataFrame(data=undo[-1]['bounding_box'],columns=['top_left-x','top_left-y','bottom_right-x','bottom_right-y'])
+                df.to_csv('%s/csv/%s.csv'%('/'.join(image.split('/')[:-1]),(image.split('/')[-1]).split('.')[0]))
                 break
         if ex:
             break

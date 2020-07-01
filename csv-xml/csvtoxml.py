@@ -5,11 +5,8 @@ import xml.etree.ElementTree as ET
 import glob
 import cv2
 
-parser = argparse.ArgumentParser(description='takes csv as input and outputs Pascol voc')
-parser.add_argument("-i", "--path", required=True,help="path to folder containing csv")
-args = vars(parser.parse_args())
-path=args['path']
-files=glob.glob(path+'*.csv')
+path='/home/dhanush/table detection/data/images1/csv/*.csv'
+files=glob.glob(path)
 for file in files:
     df = pd.read_csv(file)
     if (df.shape[0]==0):
@@ -30,15 +27,15 @@ for file in files:
     ET.SubElement(size, 'depth').text = str(depth)
     for i in range(df.shape[0]):
         ob = ET.SubElement(annotation, 'object')
-        ET.SubElement(ob, 'name').text = 'face'
+        ET.SubElement(ob, 'name').text = str(df.iloc[i,5])
         ET.SubElement(ob, 'pose').text = 'Unspecified'
         ET.SubElement(ob, 'truncated').text = '0'
         ET.SubElement(ob, 'difficult').text = '0'
         bbox = ET.SubElement(ob, 'bndbox')
-        ET.SubElement(bbox, 'xmin').text = str(df.iloc[i,0])
-        ET.SubElement(bbox, 'ymin').text = str(df.iloc[i,1])
-        ET.SubElement(bbox, 'xmax').text = str(df.iloc[i,2])
-        ET.SubElement(bbox, 'ymax').text = str(df.iloc[i,3])
+        ET.SubElement(bbox, 'xmin').text = str(df.iloc[i,1])
+        ET.SubElement(bbox, 'ymin').text = str(df.iloc[i,2])
+        ET.SubElement(bbox, 'xmax').text = str(df.iloc[i,3])
+        ET.SubElement(bbox, 'ymax').text = str(df.iloc[i,4])
 
     fileName = (file.split('/')[-1]).split('.')[0]
     tree = ET.ElementTree(annotation)

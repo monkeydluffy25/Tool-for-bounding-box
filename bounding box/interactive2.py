@@ -13,9 +13,10 @@ mode = 'rect'
 ix,iy = -1,-1
 dic={}
 global img
-
+border=True
+border_type='bordered'
 def draw(event,x,y,flags,param):
-    global ix,iy,drawing,dic,mode,editing,bounding_done,img
+    global ix,iy,drawing,dic,mode,editing,bounding_done,img,border,border_type
     if mode=='rect':
         if event == cv2.EVENT_LBUTTONDOWN and editing==True:
             drawing = True
@@ -26,7 +27,7 @@ def draw(event,x,y,flags,param):
         elif event == cv2.EVENT_LBUTTONUP and editing==True:
             drawing = False
             dic['pics'].append(cv2.rectangle(img,(ix,iy),(x,y),(0,0,255),3))
-            dic['bounding_box'].append((ix,iy,x,y))
+            dic['bounding_box'].append((ix,iy,x,y,border_type))
             
     if mode=='horizontal' and bounding_done==True:
         if event == cv2.EVENT_LBUTTONDOWN and editing==True:
@@ -128,8 +129,16 @@ else:
             if k == ord('c'):
                 ex=True
                 break
+            if k == 32 :
+                border= not border
+                if(border):
+                    border_type='bordered'
+                else:
+                    border_type='unbordered'
             if k == ord('n'):
-                df=pd.DataFrame(data=undo[-1]['bounding_box'],columns=['top_left-x','top_left-y','bottom_right-x','bottom_right-y'])
+                if(len(undo)==0):
+                    break
+                df=pd.DataFrame(data=undo[-1]['bounding_box'],columns=['top_left-x','top_left-y','bottom_right-x','bottom_right-y','border_type'])
                 df.to_csv('%s/csv/%s.csv'%('/'.join(image.split('/')[:-1]),(image.split('/')[-1]).split('.')[0]))
                 break
         if ex:

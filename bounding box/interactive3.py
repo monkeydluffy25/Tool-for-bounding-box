@@ -6,15 +6,6 @@ import os
 import argparse
 import copy
 
-bounding_done=False
-drawing = False 
-editing= True
-mode = 'rect'
-ix,iy = -1,-1
-dic={}
-global img
-border=True
-border_type='bordered'
 def draw(event,x,y,flags,param):
     global ix,iy,drawing,dic,mode,editing,bounding_done,img,border,border_type
     if mode=='rect':
@@ -70,7 +61,75 @@ def draw(event,x,y,flags,param):
             else:
                 dic['pics'].append(cv2.line(img,(ix,iy),(x,y),(0,0,255),3))
                 dic['vert'].append((ix,iy,ix,y))
-    
+def function():
+    global drawing,dic,mode,editing,bounding_done,img,border,border_type
+    dic['pics'].append(copy.deepcopy(img))
+    undo.append(dic)
+    cv2.namedWindow('image',cv2.WINDOW_NORMAL)
+    cv2.setMouseCallback('image',draw)             
+    while(1):
+        cv2.imshow('image',img)
+        k = cv2.waitKey(1) & 0xFF
+        if k == ord('r'): #reload
+            #img=cv2.imread(image)
+            #dic={'pics':[],'vert':[],'hori':[],'bounding_box':[]}
+            dic=undo[0]
+            img=undo[-1]['pics'][-1]
+        if k == ord('e'):
+            editing = not editing
+            #img=undo[-1]['pics'][-1]
+        if k == ord('s'): # quit
+            #np.savetxt('/home/dhanush/images1/csv/%s.csv'%((image.split('/')[-1]).split('.')[0]),local_array,delimiter=',')
+            if not bounding_done:
+                undo.append(copy.deepcopy(dic))
+                bounding_done=True
+            else:
+                if ((undo[-1]['pics'][-1]-img).any()):
+                    undo.append(copy.deepcopy(dic))
+        if k == ord('b'):
+            mode='rect'
+            #img=undo[-1]['pics'][-1]
+        if k == ord('h'):
+            if bounding_done:
+                mode='horizontal'
+            #img=undo[-1]['pics'][-1]
+        if k == ord('v'):
+            if bounding_done:
+                mode='vertical'
+            #img=undo[-1]['pics'][-1]
+        if k == ord('z'):
+            try:
+                redo.append(undo.pop())
+                img=undo[-1]['pics'][-1]
+            except:
+                img=cv2.imread(image)
+        if k == ord('x'):
+            try:
+                undo.append(redo.pop())
+                img=undo[-1]['pics'][-1]
+            except:
+                img=undo[-1]['pics'][-1]
+        if k == ord('c'):
+            ex=True
+            break
+        if k == 32 :
+            border= not border
+            if(border):
+                border_type='bordered'
+            else:
+                border_type='unbordered'
+            #img=undo[-1]['pics'][-1]
+        if k == ord('n'):
+            if(len(undo)==0):
+                break
+            df=pd.DataFrame(data=undo[-1]['bounding_box'],columns=['top_left-x','top_left-y','bottom_right-x','bottom_right-y','border_type'])
+            df.to_csv('%s/csv/%s.csv'%('/'.join(image.split('/')[:-1]),(image.split('/')[-1]).split('.')[0]))
+            return
+        if k == 27:
+            print('edit: %s , border: %s, Type: %s'%(str(editing),border_type,mode))
+    if ex:
+        return
+    cv2.destroyAllWindows()    
 parser = argparse.ArgumentParser(description='Creating bounding box for Table returns csv')
 parser.add_argument("-i", "--path", required=True,help="path to input folder")
 args = vars(parser.parse_args())
@@ -85,66 +144,15 @@ else:
     ex=False
     for image in images:
         bounding_done=False
+        drawing = False 
+        editing= True
+        mode = 'rect'
+        ix,iy = -1,-1
+        dic={}
+        border=True
+        border_type='bordered'
         undo,redo=[],[]
         dic={'pics':[],'vert':[],'hori':[],'bounding_box':[]}
         img=cv2.imread(image)
-        dic['pics'].append(copy.deepcopy(img))
-        cv2.namedWindow('image',cv2.WINDOW_NORMAL)
-        cv2.setMouseCallback('image',draw)             
-        while(1):
-            #img=cv2.resize(img, (1080, 1920),interpolation = cv2.INTER_CUBIC)
-            cv2.imshow('image',img)
-            k = cv2.waitKey(1) & 0xFF
-            if k == ord('r'): #reload
-                img=cv2.imread(image)
-                dic={'pics':[],'vert':[],'hori':[],'bounding_box':[]}
-            if k == ord('e'):
-                editing = not editing 
-            if k == ord('s'): # quit
-                #np.savetxt('/home/dhanush/images1/csv/%s.csv'%((image.split('/')[-1]).split('.')[0]),local_array,delimiter=',')
-                if not bounding_done:
-                    undo.append(copy.deepcopy(dic))
-                    bounding_done=True
-                else:
-                    if ((undo[-1]['pics'][-1]-dic['pics'][-1]).any()):
-                        undo.append(copy.deepcopy(dic))
-            if k == ord('b'):
-                mode='rect'
-            if k == ord('h'):
-                if bounding_done:
-                    mode='horizontal'
-            if k == ord('v'):
-                if bounding_done:
-                    mode='vertical'
-            if k == ord('z'):
-                try:
-                    redo.append(undo.pop())
-                    img=undo[-1]['pics'][-1]
-                except:
-                    img=cv2.imread(image)
-            if k == ord('x'):
-                try:
-                    undo.append(redo.pop())
-                    img=undo[-1]['pics'][-1]
-                except:
-                    img=undo[-1]['pics'][-1]
-            if k == ord('c'):
-                ex=True
-                break
-            if k == 32 :
-                border= not border
-                if(border):
-                    border_type='bordered'
-                else:
-                    border_type='unbordered'
-            if k == ord('n'):
-                if(len(undo)==0):
-                    break
-                df=pd.DataFrame(data=undo[-1]['bounding_box'],columns=['top_left-x','top_left-y','bottom_right-x','bottom_right-y','border_type'])
-                df.to_csv('%s/csv/%s.csv'%('/'.join(image.split('/')[:-1]),(image.split('/')[-1]).split('.')[0]))
-                break
-            if k == 27:
-                print('edit: %s , border: %s, Type: %s'%(str(editing),border_type,mode))
-        if ex:
-            break
-        cv2.destroyAllWindows()
+        function()
+

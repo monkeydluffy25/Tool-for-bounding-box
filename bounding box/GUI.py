@@ -9,7 +9,176 @@ import pandas as pd
 import os
 import argparse
 import copy
+
+def skew_correction(path):
+    image=cv2.imread(path)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = cv2.bitwise_not(gray)
+    thresh = cv2.threshold(gray, 0, 255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    coords = np.column_stack(np.where(thresh > 0))
+    angle = cv2.minAreaRect(coords)[-1]
+    if angle < -45:
+        angle = -(90 + angle)
+    else:
+        angle = -angle
+    (h, w) = image.shape[:2]
+    center = (w // 2, h // 2)
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    rotated = cv2.warpAffine(image, M, (w, h),flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    #print(angle)
+    return rotated
+def cont_table(img):
+    heights,widths=[],[]
+    table_image=img
+    table_imageforpro=cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    thresh_value = cv2.adaptiveThreshold(table_imageforpro,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,25,1)
+    close_k=cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
+    close_img=cv2.morphologyEx(cv2.bitwise_not(thresh_value),cv2.MORPH_CLOSE,close_k)
+    #disp(close_img)
+    contours, hierarchy = cv2.findContours(close_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    for cnt in contours:
+        x, y, w, h = cv2.boundingRect(cnt)
+        heights.append(h)
+        widths.append(w)
+        table_image = cv2.rectangle(table_image, (x, y), (x + w, y + h), (0, 0, 255), 1)
+    return table_image,heights,widths
+import matplotlib.pyplot as plt
+def disp(img):
+    cv2.namedWindow('image', cv2.WINDOW_NORMAL)
+    cv2.imshow('image',img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+def horizontal_lines(path,thresh_s,w_size,img2):
+    hori=[]
+#     img=skew_correction(path)
+#     img1=skew_correction(path)
+    img=cv2.imread(path)
+    img1=img2
+    #img1=cv2.imread(path)
+    img=cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #img= cv2.copyMakeBorder(img,20,20,20,20,cv2.BORDER_CONSTANT,value=(255,255,255))
+    #img1= cv2.copyMakeBorder(img1,20,20,20,20,cv2.BORDER_CONSTANT,value=(255,255,255))
+    ad_thresh=cv2.adaptiveThreshold(img,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,thresh_s,1)
+    open_k=cv2.getStructuringElement(cv2.MORPH_RECT,(w_size+4,1))
+    open_img=cv2.morphologyEx(cv2.bitwise_not(ad_thresh),cv2.MORPH_OPEN,open_k)
+    #open_img=cv2.morphologyEx(close_img,cv2.MORPH_OPEN,open_k)
+    c_img=cv2.morphologyEx(open_img,cv2.MORPH_CLOSE,(1,1))
+    #disp(open_img)
+    #disp(close_img)
+    #disp(c_img)
+    minLineLength = 3*w_size
+    maxLineGap = 100*w_size
+    lines = cv2.HoughLinesP(c_img,1,np.pi/180,3*w_size,minLineLength,maxLineGap)
+    if lines is None:
+        return None
+    count=0
+    for line in lines:
+        for x1,y1,x2,y2 in line:
+            cv2.line(img1,(x1,y1),(x2,y2),(0,0,255),2)
+            if(x1>x2):
+                count=count+1
+            hori.append((x1,y1,x2,y2))
+    disp(img1)
+    #print(count)
+    return hori
+def vertical_lines(path,thresh_s,h_size):
+    vert=[]
+#     img=skew_correction(path)
+#     img1=skew_correction(path)
+    img=cv2.imread(path)
+    img1=cv2.imread(path)
+    img=cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #img= cv2.copyMakeBorder(img,20,20,20,20,cv2.BORDER_CONSTANT,value=(255,255,255))
+    #img1= cv2.copyMakeBorder(img1,20,20,20,20,cv2.BORDER_CONSTANT,value=(255,255,255))
+    ad_thresh=cv2.adaptiveThreshold(img,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,thresh_s,1)
+    open_k=cv2.getStructuringElement(cv2.MORPH_RECT,(1,h_size+4))
+    open_img=cv2.morphologyEx(cv2.bitwise_not(ad_thresh),cv2.MORPH_OPEN,open_k)
+    #open_img=cv2.morphologyEx(close_img,cv2.MORPH_OPEN,open_k)
+    c_img=cv2.morphologyEx(open_img,cv2.MORPH_CLOSE,(1,1))
+    #disp(open_img)
+    #disp(close_img)
+    #disp(c_img)
+    minLineLength = 3*h_size
+    maxLineGap = 4*h_size
+    lines = cv2.HoughLinesP(c_img,1,np.pi/180,3*h_size,minLineLength,maxLineGap)
+    if lines is None:
+        return None
+    count=0
+    for line in lines:
+        for x1,y1,x2,y2 in line:
+            cv2.line(img1,(x1,y1),(x2,y2),(0,0,255),1)
+            if(y1>y2):
+                count=count+1
+            vert.append((x1,y1,x2,y2))
+    #disp(img1)
+    #print(count)
+    return vert,img1
+from sys import maxsize
+mi,ma=-maxsize,maxsize
+def sort_select_best(path,hori,vert,w_size,h_size):
+    global mi,ma
+    HOR,VER=[],[]
+#     img=skew_correction(path)
+    img=cv2.imread(path)
+    img= cv2.copyMakeBorder(img,20,20,20,20,cv2.BORDER_CONSTANT,value=(255,255,255))
+    if(hori == None and vert== None):
+        return None
+    sort_hori=sorted(hori,key=lambda x: x[1])
+    sort_vert=sorted(vert,key=lambda x: x[0])
+    prev,mi_x1,ma_x2,i=hori[0][1],hori[0][0],hori[0][2],0
+    for x1,y1,x2,y2 in sort_hori:
+        #if (abs(y1-y2)<2):
+        if (y1>=prev and y1<=(prev+h_size) and abs(x1-x2)>100*w_size):
+            if(x1<mi_x1):
+                mi_x1=x1
+            if(x2>ma_x2):
+                ma_x2=x2
+        else:
+            if (mi_x1!=ma and ma_x2!=mi and abs(x1-x2)>100*w_size):
+                HOR.append([mi_x1,prev,ma_x2,prev])
+            i=i+1
+            mi_x1,ma_x2,prev=ma,mi,y1
+    if (mi_x1!=ma and ma_x2!=mi):
+        HOR.append([mi_x1,prev,ma_x2,prev])
     
+    prev,mi_y1,ma_y2,j=vert[0][0],vert[0][1],vert[0][3],0
+    for x1,y1,x2,y2 in sort_vert:
+        #if (abs(x1-x2)<2):
+        if (x1>=prev and x1<=(prev+w_size) and abs(y1-y2)>10*h_size):
+            if(y1<mi_y1):
+                mi_y1=y1
+            if(y2>ma_y2):
+                ma_y2=y2
+        else:
+            if (mi_y1!=ma and ma_y2!=mi and abs(y1-y2)>10*h_size):
+                VER.append([prev,mi_y1,prev,ma_y2])
+            j=j+1
+            mi_y1,ma_y2,prev=ma,mi,x1
+    if(mi_y1!=ma and ma_y2!=mi):
+        VER.append([prev,mi_y1,prev,ma_y2])
+    
+    for x1,y1,x2,y2 in VER:
+        #print(x1,y1,x2,y2)
+        cv2.line(img,(x1,y1),(x2,y2),(0,0,255),3)
+    for x1,y1,x2,y2 in HOR:
+        #print(x1,y1,x2,y2)
+        cv2.line(img,(x1,y1),(x2,y2),(0,0,255),3)
+    #print(i,j)
+    disp(img)
+from statistics import mean,mode,median
+def lines(path):
+    #disp(cv2.imread(path))
+    dic={}
+    img,h,w=cont_table(skew_correction(path))
+    dic[0],dic[1]=int(median(w)),int(median(h))
+    dic[2]=max(dic[0],dic[1])+2
+    for i in dic:
+        if dic[i]%2==0:
+            dic[i]=dic[i]+1
+    vert,img2=vertical_lines(path,dic[2],dic[1])
+    hori=horizontal_lines(path,dic[2],dic[0],img2)
+    return hori,vert
+    #sort_select_best(path,hori,vert,dic[0],dic[1])    
 class SampleApp(tk.Tk):
     def __init__(self):
         tk.Tk.__init__(self)
@@ -33,10 +202,10 @@ class StartPage(tk.Frame):
 class PageOne(tk.Frame):
     def __init__(self, master):
         tk.Frame.__init__(self, master)
-        global v1,v,v2,bounding_done,drawing,editing,mode,ix,iy,border_type,dic,undo,redo,img,path
+        global v1,v,v2,bounding_done,drawing,editing,mode,ix,iy,border_type,dic,undo,redo,img,path,e_hori,e_vert
         v1,v,v2=tk.BooleanVar(),tk.StringVar(),tk.StringVar()
         path = tk.filedialog.askopenfilename()
-        bounding_done,drawing,editing,mode,ix,iy,border_type,dic,undo,redo=False,False,True,'rect',-1,-1,'bordered',\
+        bounding_done,drawing,editing,mode,ix,iy,border_type,dic,undo,redo=False,False,False,'rect',-1,-1,'bordered',\
         {'pics':[],'vert':[],'hori':[],'bounding_box':[]},[],[]
         img=cv2.imread(path)
         tk.Radiobutton(self, text='rect', variable=v, value='rect',command=self.g).pack(side=tk.LEFT) 
@@ -47,10 +216,24 @@ class PageOne(tk.Frame):
         tk.Checkbutton(self, text='editing', variable=v1,command=self.edit).pack(side=tk.LEFT)
         tk.Radiobutton(self, text='bordered', variable=v2, value="bordered",command=self.g).pack(side=tk.LEFT)
         tk.Radiobutton(self, text='unbordered', variable=v2, value="unbordered",command=self.g).pack(side=tk.LEFT)
+
+        e_hori,e_vert=lines(path)
+        tk.Button(self, text="export",command=self.export_csv).pack()
         tk.Button(self, text="undo",command=self.undo_fun).pack()
         tk.Button(self, text="redo",command=self.redo_fun).pack()
         tk.Button(self, text="edit",command=self.function).pack()
         tk.Button(self, text="next",command=lambda: master.switch_frame(StartPage)).pack()
+    def export_csv(self):
+        global e_hori,e_vert,path
+        if(len(e_hori)==0 or len(e_vert)==0):
+            print('nothing to save')
+        else:
+            df1=pd.DataFrame(data=e_vert,columns=['x1','y1','x2','y2'])
+            df1['type']='vert'
+            df2=pd.DataFrame(data=e_hori,columns=['x1','y1','x2','y2'])
+            df2['type']='hori'
+            df=df1.append(df2,ignore_index = True)
+            df.to_csv('%s/exported_csv/%s.csv'%('/'.join(path.split('/')[:-1]),(path.split('/')[-1]).split('.')[0]))
     def edit(self):
         global editing,v1
         editing=v1.get()
@@ -138,6 +321,8 @@ class PageOne(tk.Frame):
                 img=cv2.imread(path)
             if k == ord('n'):
                 self.save_csv()
+            if k == ord('e'):
+                editing = not editing
             if k == ord('h'):
                 if bounding_done:
                     mode='horizontal'
@@ -156,14 +341,17 @@ class PageOne(tk.Frame):
                 try:
                     redo.append(undo.pop())
                     img=undo[-1]['pics'][-1]
+                    dic=undo[-1]
                 except:
                     img=cv2.imread(path)
             if k == ord('x'):
                 try:
                     undo.append(redo.pop())
                     img=undo[-1]['pics'][-1]
+                    dic=undo[-1]
                 except:
                     img=undo[-1]['pics'][-1]
+                    dic=undo[-1]
             if k == 27:
                 print('edit: %s , border: %s, Type: %s'%(str(editing),border_type,mode))
             if k == ord('c'):
@@ -174,6 +362,7 @@ class PageOne(tk.Frame):
         try:
             redo.append(undo.pop())
             img=undo[-1]['pics'][-1]
+            dic=undo[-1]
         except:
             img=cv2.imread(path)
     def redo_fun(self):
@@ -181,8 +370,10 @@ class PageOne(tk.Frame):
         try:
             undo.append(redo.pop())
             img=undo[-1]['pics'][-1]
+            dic=undo[-1]
         except:
             img=undo[-1]['pics'][-1]
+            dic=undo[-1]
     def save_csv(self):
         global undo,path
         if(len(undo)==0):

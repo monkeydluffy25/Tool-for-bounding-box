@@ -4,14 +4,19 @@ from lxml import etree
 import xml.etree.ElementTree as ET
 import glob
 import cv2
+import argparse
 
-path='/home/dhanush/table detection/data/images1/csv/*.csv'
+parser = argparse.ArgumentParser(description='convert csv to Voc XML')
+parser.add_argument("-i", "--path", required=True,help="path to input folder")
+args = vars(parser.parse_args())
+path=args['path']+'*.csv'
 files=glob.glob(path)
 for file in files:
     df = pd.read_csv(file)
     if (df.shape[0]==0):
         continue
-    img=cv2.imread(('/'.join(path.split('/')[:-2]))+'/'+(file.split('/')[-1]).split('.')[0]+'.jpg')
+    df = df[(df['border_type']=='bordered') | (df['border_type']=='unbordered')]
+    img=cv2.imread(('/'.join(path.split('/')[:-2]))+'/images/'+(file.split('/')[-1]).split('.')[0]+'.jpg')
     height=img.shape[0]
     width=img.shape[1]
     depth = img.shape[2]

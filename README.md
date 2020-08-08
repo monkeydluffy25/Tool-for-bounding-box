@@ -17,3 +17,12 @@ In interactive mode following keyboard keys are to be used:
 4) 'c' to close without saving and to stop the further processing of files in the folder
 
 Note: also u cant see the bounding box until u complete ur box like hold the left mouse button,drag around the table and then release the left mouse button to see the box.
+
+# GUI code ReadME
+
+
+Run "pip install -r requirement.txt" - this step is once for setting up the required modules "running it everytime is not necessary"
+
+Run "sudo apt-get install python-tk python3-tk python-imaging-tk"
+
+Run "python3 GUI.py"
